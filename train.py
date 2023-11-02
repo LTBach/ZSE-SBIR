@@ -9,7 +9,7 @@ from tensorboardX import SummaryWriter
 from options import Option
 from data_utils.dataset import load_data
 from model.model import Model
-from utils.util import build_optimizer, save_checkpoint, setup_seed
+from utils.util import build_optimizer, save_checkpoint, setup_seed, load_checkpoint
 from utils.loss import triplet_loss, rn_loss
 from utils.valid import valid_cls
 
@@ -18,15 +18,28 @@ def train():
     train_data, sk_valid_data, im_valid_data = load_data(args)
 
     model = Model(args)
+    start_epoch = 0
+    accuracy = 0
+
+    if args.load is not None:
+        checkpoint = load_checkpoint(args.load)
+
+        cur = model.state_dict()
+        new = {k: v for k, v in checkpoint['model'].items() if k in cur.keys()}
+        cur.update(new)
+        model.load_state_dict(cur)
+
+        accuracy = checkpoint['map_all']
+        start_epoch = checkpoint['epoch']
+
+        print("Loading checkpoint successfully!")
+
     model = model.cuda()
 
     # batch=15, lr=1e-5 / batch=30, lr=2e-5
     optimizer = build_optimizer(args, model)
 
     train_data_loader = DataLoader(train_data, args.batch, num_workers=2, drop_last=True)
-
-    start_epoch = 0
-    accuracy = 0
 
     for i in range(start_epoch, args.epoch):
         print('------------------------train------------------------')
@@ -70,7 +83,7 @@ def train():
                 print(f'epoch_{epoch} step_{step} eta {remaining_time}: loss:{loss.item():.3f} '
                       f'tri:{losstri.item():.3f} rn:{lossrn.item():.3f}')
 
-        if epoch >= 10:
+        if epoch >= 1:
             print('------------------------valid------------------------')
             # log
             map_all, map_200, precision_100, precision_200 = valid_cls(args, model, sk_valid_data, im_valid_data)
