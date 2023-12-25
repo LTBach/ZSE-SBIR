@@ -1,5 +1,5 @@
 import torch
-from torch import nn
+from torch import e, nn
 from einops import rearrange, repeat
 from .rn import Scale_Embedding
 import math
@@ -50,9 +50,9 @@ class MultiHeadDotProductAttention(nn.Module):
             idx, _ = torch.sort(idx)
             index = idx.unsqueeze(-1).expand(-1, -1, c)  # [B, left_tokens, C]
 
-            return x, index, idx, cls_attn, left_tokens
+            return x, index, idx, cls_attn, left_tokens, attn
 
-        return out, None, None, None, left_tokens
+        return out, None, None, None, left_tokens, attn
 
 
 class FeedForward(nn.Module):
@@ -87,9 +87,9 @@ class Encoder1DBlock(nn.Module):
         self.mlp = FeedForward(input_shape, mlp_dim, dropout_rate)
         self.drop_out_attention = nn.Dropout(attention_dropout_rate)
 
-    def forward(self, inputs, keep_rate):
+    def forward(self, inputs, keep_rate, return_attention = False):
         x = self.layer_norm_input(inputs)
-        x, index, idx, cls_attn, left_tokens = self.attention(x, keep_rate)
+        x, index, idx, cls_attn, left_tokens, attn = self.attention(x, keep_rate)
         x = self.drop_out_attention(x)
         x = x + inputs
 
@@ -101,6 +101,10 @@ class Encoder1DBlock(nn.Module):
 
         y = self.layer_norm_out(x)
         y = self.mlp(y)
+
+        if return_attention:
+          return attn
+        
         return x + y, left_tokens, idx
 
 
@@ -120,15 +124,23 @@ class Encoder(nn.Module):
         self.keep_rate = (1, ) * 12
         # self.keep_rate = (1, 1, 1, 0.9) + (1, 1, 0.9) + (1, 1, 0.9) + (1, 1)    # 196 -> 177 -> 160 -> 144
 
-    def forward(self, img, mask=None):
+    def forward(self, img, mask=None, return_attention = False):
         x = img
         left_tokens = []
         idxs = []
 
-        for i, layer in enumerate(self.layers):
-            x, left_token, idx = layer[0](x, self.keep_rate[i])
-            left_tokens.append(left_token)
-            idxs.append(idx)
+        if return_attention:
+          for i, layer in enumerate(self.layers):
+            if i < len(self.layers) - 1:
+              x, _, _ = layer[0](x, self.keep_rate[i])
+            else:
+              return layer[0](x, self.keep_rate[i], return_attention = True)
+
+        else:
+          for i, layer in enumerate(self.layers):
+              x, left_token, idx = layer[0](x, self.keep_rate[i])
+              left_tokens.append(left_token)
+              idxs.append(idx)
 
         return self.encoder_norm(x), left_tokens, idxs
 
@@ -153,7 +165,7 @@ class ViTPatch(nn.Module):
         self.to_cls_token = nn.Identity()
         # self.mlp_head = nn.Linear(hidden_size, num_classes)
 
-    def forward(self, img, mask=None):
+    def prepare_tokens(self, img):
         x1 = self.embedding(img)
         x2 = self.scale(img)
         x = (x1 + x2) / 2
@@ -165,12 +177,24 @@ class ViTPatch(nn.Module):
         x = torch.cat((cls_tokens, x), dim=1)
         x += self.pos_embedding[:, :(n + 1)]
         x = self.dropout(x)
+
+        return x
+
+    def forward(self, img, mask=None):
+        x = self.prepare_tokens(img)
+
         x, left_tokens, idxs = self.transformer(x)
 
         # x1 = self.to_cls_token(x[:, 0])
         # return x1, x[:, 1:]
 
         return x, left_tokens, idxs
+      
+    def get_last_selfattention(self, img):
+        x = self.prepare_tokens(img)
+        
+        return self.transformer(x, return_attention = True)
+
 
 
 class Self_Attention(nn.Module):
@@ -197,4 +221,7 @@ class Self_Attention(nn.Module):
     def forward(self, x):
         sa_fea, left_tokens, idxs = self.model(x)
         return sa_fea, left_tokens, idxs
+
+    def get_last_selfattention(self, x):
+        return self.model.get_last_selfattention(x)
 

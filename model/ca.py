@@ -44,8 +44,13 @@ class EncoderLayer(nn.Module):
         self.sublayer = clones(AddAndNorm(size, dropout), 2)
         self.size = size
 
-    def forward(self, q, k, v, mask):
-        x = self.sublayer[0](v, self.self_attn(q, k, v, mask))
+    def forward(self, q, k, v, mask, return_attention = False):
+        score, attn = self.self_attn(q, k, v, mask)
+
+        if return_attention:
+          return attn
+
+        x = self.sublayer[0](v, score)
         x = self.sublayer[1](x, self.feed_forward(x))
         return x
 
@@ -58,15 +63,29 @@ class Encoder(nn.Module):
         self.layer1 = clones(layer, N)
         self.layer2 = clones(layer, N)
 
-    def forward(self, x_im, x_sk, mask):
-        for layer1, layer2 in zip(self.layer1, self.layer2):
-            # 在此交换Q
-            # layer1 处理 sk
-            x_sk1 = layer1(x_sk, x_im, x_sk, mask)
-            # layer2 处理im
-            x_im = layer2(x_im, x_sk, x_im, mask)
-            x_sk = x_sk1
-        return x_im, x_sk
+    def forward(self, x_im, x_sk, mask, return_attention = False):
+        if return_attention:
+          i = 0
+          for layer1, layer2 in zip(self.layer1, self.layer2):
+            if i < len(self.layers) - 1:
+              # 在此交换Q
+              # layer1 处理 sk
+              x_sk1 = layer1(x_sk, x_im, x_sk, mask)
+              # layer2 处理im
+              x_im = layer2(x_im, x_sk, x_im, mask)
+              x_sk = x_sk1
+            else:
+              return layer1(x_sk, x_im, x_sk, mask, return_attention = True), layer2(x_im, x_sk, x_im, mask, return_attention = True)
+            i += 1
+        else:
+          for layer1, layer2 in zip(self.layer1, self.layer2):
+              # 在此交换Q
+              # layer1 处理 sk
+              x_sk1 = layer1(x_sk, x_im, x_sk, mask)
+              # layer2 处理im
+              x_im = layer2(x_im, x_sk, x_im, mask)
+              x_sk = x_sk1
+          return x_im, x_sk
 
 
 def attention(query, key, value, dropout=None, mask=None, pos=None):
@@ -126,7 +145,7 @@ class MultiHeadedAttention(nn.Module):
         x = x.transpose(1, 2).contiguous() \
             .view(nbatches, -1, self.h * self.d_k)
 
-        return self.linears[-1](x)
+        return self.linears[-1](x), self.attn
 
 
 class PositionwiseFeedForward(nn.Module):
@@ -161,3 +180,9 @@ class Cross_Attention(nn.Module):
         x_im = x[length // 2:]
         x_im, x_sk = self.encoder(x_im, x_sk, None)  # 不要mask
         return torch.cat((x_sk, x_im), dim=0)
+      
+    def get_last_crossattention(self, x):
+        length = x.size(0)
+        x_sk = x[:length // 2]
+        x_im = x[length // 2:]
+        return self.encoder(x_im, x_sk, mask = None, return_attention = True)

@@ -72,6 +72,10 @@ class Model(nn.Module):
                 # print('cls_fea:', cls_fea.size())
                 # print('rn_scores:', cls_fea.size())
                 return cls_fea, rn_scores
+            
+    def get_sa(self, im):
+        sa_fea, _, _ = self.sa(im)
+        return sa_fea
 
 if __name__ == '__main__':
     args = Option().parse()
