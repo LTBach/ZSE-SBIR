@@ -7,7 +7,7 @@ class Option:
         parser = argparse.ArgumentParser(description="args for model")
 
         # dataset
-        parser.add_argument('--data_path', type=str, default="./datasets")
+        parser.add_argument('--data_path', type=str, default="datasets")
         parser.add_argument('--dataset', type=str, default='sketchy_extend',
                             choices=['sketchy_extend', 'tu_berlin', 'Quickdraw'])
         parser.add_argument('--test_class', type=str, default='test_class_sketchy25',
@@ -31,7 +31,7 @@ class Option:
         parser.add_argument('--weight_decay', type=float, default=1e-2)
 
         # test
-        parser.add_argument('--load', '-l', type=str, default=None)
+        parser.add_argument('--load', '-l', type=str, default="checkpoint/best_checkpoint.pth")
         parser.add_argument('--retrieval', '-r', type=str, default='rn', choices=['rn', 'sa'])
         parser.add_argument('--testall', default=False, action='store_true', help='train/test scale')
         parser.add_argument('--test_sk', type=int, default=20)
@@ -41,6 +41,19 @@ class Option:
         # other
         parser.add_argument('--choose_cuda', '-c', type=str, default='0')
         parser.add_argument("--seed", type=int, default=2021, help="random seed.")
+
+        # Image
+        parser.add_argument('--image_path', type = str, default = None)
+        parser.add_argument('--image_type', type = str, default = 'im')
+        parser.add_argument('--sketch_path', '-sk', type = str, default = None)
+
+        # Visualize module
+        parser.add_argument('--visualize_module', type = str, default = 'sa')
+        parser.add_argument('--output_dir', type = str, default = './output')
+        parser.add_argument('--threshold', type = float, default = None)
+
+        # Demo
+        parser.add_argument('--demo', type = bool, default = False)
 
         self.parser = parser
 

@@ -58,3 +58,21 @@ class Logger(object):
 
     def flush(self):
         pass
+
+def get_output_file(path, extension="png"):
+    """
+    Assumes sketch file in path have suffix -{number}.
+    Finds the highest number and return path for next sketch.
+    """
+    sketch_id = 0
+    for file_name in os.listdir(path):
+        try:
+            id_on_file = int(file_name.split('-')[-1][:-4])
+            if id_on_file > sketch_id:
+                    sketch_id = id_on_file
+        except:
+            pass
+    sketch_id += 1
+    sketch_file = f"sketch-{sketch_id}.{extension}"
+
+    return os.path.join(path, sketch_file), sketch_id
