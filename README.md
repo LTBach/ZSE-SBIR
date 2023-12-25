@@ -26,10 +26,8 @@ Please go to the [QuickDraw official website](https://github.com/googlecreativel
 The requirements of this repo can be found in `requirements.txt`.
 
 ```bash
-conda create -n zse-sbir python=3.6
+conda create -n zse-sbir
 pip install -r requirements.txt
-# or the same pytorch versioin as ours
-pip install torch==1.10.0+cu113 torchvision==0.11.1+cu113 torchaudio==0.10.0+cu113 -f https://download.pytorch.org/whl/torch_stable.html
 ```
 
 ## Train
@@ -64,7 +62,7 @@ learning_rate,        # learning rate, 1e-5 as default.
 weight_decay,         # weight decay, 1e-2 as default.
 
 # test
-load, -l,             # path to load checkpoints.
+load, -l,             # path to load checkpoints, checkpoint/checkpoint.pth as default.
 retrieval, -r,        # test method, rn for ret-token and sa for cls-token, use rn as default.
 testall,              # whether use all test data, suggesting false for train, true for test.
 test_sk,              # number of sketches per loop during test, 20 as default.
@@ -171,6 +169,29 @@ python -u test.py --data_path [./datasets] \
                   -r rn \ 
                   --testall
 ```
+
+You can checkout the Evaluation.ipynb 
+
+## App
+
+### Setup
+
+Download or train the model then save the checkpoint to checkpoint/best_checkpoint.pth
+Inference using features.extraction.py:
+
+```
+!python features_extraction.py -l best_checkpoint_pretrain.pth --image_path datasets/{Dataset}/256x256/photo
+```
+
+Or download at [Kaggle](https://www.kaggle.com/code/bchlngton/feature-extraction-zse-sbir) and put feature folder into datasets/{Dataset}/256x256/sa_features
+
+### Running
+
+To use the app, running the following command:
+```
+python app.py
+```
+
 
 ## License
 This project is released under the [MIT License](./LICENSE).
